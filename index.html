@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Juego de Campos Quirúrgicos - 3 Fases</title>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{
+            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+            background:linear-gradient(135deg,#e0f2fe 0%,#f3e8ff 100%);
+            min-height:100vh;padding:10px;
+        }
+        .container{
+            max-width:1400px;margin:0 auto;background:white;border-radius:20px;
+            box-shadow:0 20px 60px rgba(0,0,0,0.15);padding:20px;
+        }
+        h1{text-align:center;color:#1f2937;font-size:clamp(1.5rem,5vw,2.5rem);margin-bottom:10px;}
+        .subtitle{text-align:center;color:#6b7280;margin-bottom:20px;font-size:clamp(0.9rem,2vw,1rem);padding:0 10px;}
+        .stats-bar{display:flex;justify-content:space-around;align-items:center;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:15px;border-radius:15px;margin-bottom:20px;color:white;flex-wrap:wrap;gap:15px}
+        .stat-item{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:80px}
+        .stat-label{font-size:clamp(0.8rem,2vw,0.9rem);opacity:0.9}
+        .stat-value{font-size:clamp(1.3rem,3vw,1.8rem);font-weight:bold}
+        .lives{display:flex;gap:5px;font-size:clamp(1.2rem,3vw,1.5rem)}
+        .life{transition:all 0.3s}
+        .life.lost{opacity:0.3;filter:grayscale(100%)}
+        .timer{font-family:'Courier New',monospace}
+        .phase-indicator{text-align:center;font-size:clamp(1rem,2.5vw,1.2rem);font-weight:bold;color:#667eea;margin-bottom:15px;padding:10px;background:#f0f4ff;border-radius:10px}
+        .progress-container{margin-bottom:20px;padding:0 10px}
+        .progress-label{display:flex;justify-content:space-between;margin-bottom:8px;font-size:clamp(0.8rem,2vw,0.9rem);color:#6b7280}
+        .progress-bar-wrapper{width:100%;height:25px;background:#e5e7eb;border-radius:15px;overflow:hidden;box-shadow:inset 0 2px 4px rgba(0,0,0,0.1)}
+        .progress-bar{height:100%;background:linear-gradient(90deg,#667eea 0%,#764ba2 100%);border-radius:15px;transition:width 0.5s ease;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:clamp(0.75rem,2vw,0.9rem);min-width:0%}
+        .progress-bar.complete{background:linear-gradient(90deg,#10b981 0%,#059669 100%)}
+        .game-grid{display:grid;grid-template-columns:1fr;gap:20px}
+        @media(min-width:768px){.game-grid{grid-template-columns:1fr 2fr}}
+        .sidebar{display:flex;flex-direction:column;gap:15px}
+        .section-title{font-size:clamp(1rem,2.5vw,1.25rem);font-weight:600;color:#374151;margin-bottom:10px}
+        .drapes-container{display:flex;flex-direction:column;gap:10px}
+        .drape{height:90px;border:4px solid #a855f7;border-radius:12px;cursor:move;transition:all 0.3s;position:relative;overflow:hidden;background-image:url("img/sabanas.jpg");background-size:cover;background-position:center;touch-action:none}
+        @media(min-width:768px){.drape{height:110px}}
+        .drape-campo1,.drape-campo2,.drape-campo3,.drape-campo4{background-image:url("img/sabanas2.jpg");border-color:#3b82f6}
+        .drape-overlay{background-image:url("img/sabanas2.jpg");border-color:#0ea5a4}
+        .drape:hover:not(.placed){transform:scale(1.05);box-shadow:0 10px 30px rgba(0,0,0,0.2)}
+        .drape.placed{opacity:0.3;cursor:not-allowed;border-color:#d1d5db}
+        .drape-label{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(0,0,0,0.7),transparent);color:white;padding:10px;text-align:center;font-weight:bold;font-size:clamp(0.85rem,2vw,1rem)}
+        .body-area{background:#fef3c7;border:4px solid #9ca3af;border-radius:12px;position:relative;overflow:hidden;min-height:400px}
+        @media(min-width:768px){.body-area{min-height:600px}}
+        .body-image{width:100%;height:auto;display:block}
+        .drop-zone{position:absolute;border:4px dashed #60a5fa;border-radius:10px;transition:all 0.3s;background:rgba(96,165,250,0.1);z-index:5}
+        .drop-zone.drag-over{background:rgba(96,165,250,0.3);border-color:#2563eb}
+        .drop-zone.has-drape{border:none;background:transparent}
+        .drop-zone.phase1-zone{z-index:10}
+        .drop-zone.phase1-zone.has-drape{z-index:15}
+        .drop-zone.phase2-zone{border-color:#10b981;border-width:3px;pointer-events:auto}
+        .drop-zone.phase2-zone.has-drape{pointer-events:none}
+        .drop-zone.phase2-zone.drag-over{border-color:#059669;background:rgba(16,185,129,0.3)}
+        .drop-zone .placeholder{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#2563eb;font-weight:600;text-align:center;width:90%;font-size:clamp(0.7rem,1.5vw,0.85rem);display:none}
+        .drop-zone.phase2-zone .placeholder{color:#10b981}
+        .placed-drape{width:100%;height:100%;border-radius:8px;position:absolute;top:0;left:0;overflow:hidden;background-image:url("img/sabanas.jpg");background-size:cover;background-position:center;pointer-events:none}
+        .placed-drape.drape-campo1,.placed-drape.drape-campo2,.placed-drape.drape-campo3,.placed-drape.drape-campo4{background-image:url("img/sabanas2.jpg")}
+        .placed-drape .drape-label{font-size:clamp(0.7rem,1.5vw,0.85rem);padding:6px;display:none}
+        /* overlay-specific visual rules (para Fase 3) */
+        .placed-overlay{
+            /* background image set inline via JS */
+            border-radius:12px;
+            pointer-events:none;
+            /* ensure visible above campos pero allow mask to reveal hole */
+            z-index:995;
+        }
+        /* Modal & other UI (reusable) */
+        .success-modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:999;align-items:center;justify-content:center;padding:20px}
+        .success-modal.show{display:flex}
+        .success-content{background:white;border-radius:20px;padding:30px;max-width:520px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+        .success-title{font-size:clamp(1.5rem,4vw,2rem);font-weight:bold;color:#10b981;margin-bottom:15px}
+        .success-message{font-size:clamp(1rem,2.5vw,1.2rem);color:#374151;margin-bottom:25px}
+        .next-phase-button{padding:15px 40px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;border:none;border-radius:12px;font-size:clamp(1.1rem,2.5vw,1.3rem);font-weight:bold;cursor:pointer;transition:all 0.3s;width:100%;max-width:300px}
+        .next-phase-button:hover{transform:scale(1.05);box-shadow:0 10px 30px rgba(102,126,234,0.4)}
+        .modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center;padding:20px}
+        .modal.show{display:flex}
+        .modal-content{background:white;border-radius:20px;padding:30px;max-width:600px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-height:90vh;overflow-y:auto}
+        .modal-title{font-size:clamp(1.5rem,4vw,2rem);font-weight:bold;color:#1f2937;margin-bottom:20px;text-align:center}
+        .option{padding:15px;background:#f3f4f6;border:3px solid #d1d5db;border-radius:12px;cursor:pointer;transition:all 0.3s}
+        .option:hover{background:#e5e7eb;border-color:#9ca3af;transform:translateX(5px)}
+        .option.correct{background:#d1fae5;border-color:#10b981;color:#065f46}
+        .option.incorrect{background:#fee2e2;border-color:#ef4444;color:#991b1b}
+        .quiz-feedback{margin-top:20px;padding:15px;border-radius:10px;text-align:center;font-weight:bold;font-size:clamp(0.95rem,2vw,1.1rem)}
+        .quiz-feedback.correct{background:#d1fae5;color:#065f46}
+        .quiz-feedback.incorrect{background:#fee2e2;color:#991b1b}
+        .next-button{margin-top:15px;padding:12px 30px;background:#667eea;color:white;border:none;border-radius:10px;font-size:clamp(1rem,2vw,1.1rem);font-weight:bold;cursor:pointer;width:100%;transition:all 0.3s}
+        .next-button:hover{background:#5568d3;transform:translateY(-2px)}
+        .game-over{padding:30px 20px;text-align:center}
+        .restart-button{padding:15px 40px;background:#10b981;color:white;border:none;border-radius:12px;font-size:clamp(1rem,2.5vw,1.2rem);font-weight:bold;cursor:pointer;width:100%;max-width:300px}
+        .restart-button:hover{background:#059669;transform:scale(1.05)}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Juego de Campos Quirúrgicos</h1>
+        <p class="subtitle">Arrastra las sábanas a las posiciones correctas del cuerpo</p>
+
+        <!-- Stats -->
+        <div class="stats-bar">
+            <div class="stat-item">
+                <div class="stat-label">Vidas</div>
+                <div class="lives" id="lives">
+                    <span class="life">❤️</span>
+                    <span class="life">❤️</span>
+                    <span class="life">❤️</span>
+                </div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Tiempo</div>
+                <div class="stat-value timer" id="timer">04:00</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Nota</div>
+                <div class="stat-value" id="score">20</div>
+            </div>
+        </div>
+
+        <div class="phase-indicator" id="phaseIndicator">Fase 1: Sábanas Principales</div>
+
+        <!-- Progress -->
+        <div class="progress-container">
+            <div class="progress-label">
+                <span id="progressText">Campos colocados: 0/7</span>
+                <span id="progressPercent">0%</span>
+            </div>
+            <div class="progress-bar-wrapper">
+                <div class="progress-bar" id="progressBar">0%</div>
+            </div>
+        </div>
+
+        <div class="game-grid">
+            <!-- Sidebar drapes -->
+            <div class="sidebar">
+                <div>
+                    <h2 class="section-title">Campos disponibles:</h2>
+                    <div class="drapes-container" id="drapesContainer">
+                        <!-- Phase 1 -->
+                        <div class="drape drape-cephalic phase1" draggable="true" data-drape="cephalic" id="drape-cephalic">
+                            <div class="drape-label">Sábana cefálica</div>
+                        </div>
+                        <div class="drape drape-feet phase1" draggable="true" data-drape="feet" id="drape-feet">
+                            <div class="drape-label">Sábana de pies</div>
+                        </div>
+
+                        <!-- Phase 2 (hidden until phase 2) -->
+                        <div class="drape drape-campo1 phase2" draggable="true" data-drape="campo1" id="drape-campo1" style="display:none;">
+                            <div class="drape-label">Campo 1</div>
+                        </div>
+                        <div class="drape drape-campo2 phase2" draggable="true" data-drape="campo2" id="drape-campo2" style="display:none;">
+                            <div class="drape-label">Campo 2</div>
+                        </div>
+                        <div class="drape drape-campo3 phase2" draggable="true" data-drape="campo3" id="drape-campo3" style="display:none;">
+                            <div class="drape-label">Campo 3</div>
+                        </div>
+                        <div class="drape drape-campo4 phase2" draggable="true" data-drape="campo4" id="drape-campo4" style="display:none;">
+                            <div class="drape-label">Campo 4</div>
+                        </div>
+
+                        <!-- Phase 3 overlay (hidden until phase 3) -->
+                        <div class="drape drape-overlay phase3" draggable="true" data-drape="overlay" id="drape-overlay" style="display:none;">
+                            <div class="drape-label">Campo de Hendidura</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Body area -->
+            <div class="body-area" id="bodyArea">
+                <img class="body-image" src="body.png" alt="Cuerpo humano">
+
+                <!-- Phase 1 zones -->
+                <div class="drop-zone phase1-zone" id="zone-cephalic" data-zone="cephalic"
+                     style="top:18%;left:25%;width:50%;height:12%;z-index:10;">
+                    <div class="placeholder">Zona cefálica</div>
+                </div>
+
+                <div class="drop-zone phase1-zone" id="zone-feet" data-zone="feet"
+                     style="top:50%;left:25%;width:50%;height:40%;z-index:10;">
+                    <div class="placeholder">Zona de pies</div>
+                </div>
+
+                <!-- Phase 2 zones (hidden until phase 2) -->
+                <div class="drop-zone phase2-zone" id="zone-campo2" data-zone="campo2"
+                     style="top:22%;left:30%;width:40%;height:6%;display:none;z-index:100;">
+                    <div class="placeholder">Campo 2</div>
+                </div>
+
+                <div class="drop-zone phase2-zone" id="zone-campo4" data-zone="campo4"
+                     style="top:28%;left:30%;width:16%;height:14%;display:none;z-index:100;">
+                    <div class="placeholder">Campo 4</div>
+                </div>
+
+                <div class="drop-zone phase2-zone" id="zone-campo3" data-zone="campo3"
+                     style="top:28%;left:54%;width:16%;height:14%;display:none;z-index:100;">
+                    <div class="placeholder">Campo 3</div>
+                </div>
+
+                <div class="drop-zone phase2-zone" id="zone-campo1" data-zone="campo1"
+                     style="top:42%;left:30%;width:40%;height:10%;display:none;z-index:100;">
+                    <div class="placeholder">Campo 1</div>
+                </div>
+
+                <!-- Phase 3 overlay zone (centro) -->
+                <div class="drop-zone phase3-zone" id="zone-overlay" data-zone="overlay"
+                     style="top:24%;left:30%;width:40%;height:30%;display:none;z-index:200;">
+                    <div class="placeholder">Coloca el Campo de Hendidura aquí</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal (reusable; texto dinámico) -->
+    <div class="success-modal" id="successModal">
+        <div class="success-content">
+            <h2 class="success-title" id="successTitle">Fase completada</h2>
+            <p class="success-message" id="successMessage">Has avanzado.</p>
+            <button class="next-phase-button" id="successButton">Siguiente Fase</button>
+        </div>
+    </div>
+
+    <!-- Quiz Modal -->
+    <div class="modal" id="quizModal">
+        <div class="modal-content">
+            <h2 class="modal-title">¡Pregunta de Recuperación!</h2>
+            <p class="question-text" id="questionText"></p>
+            <div class="options" id="optionsContainer"></div>
+            <div class="quiz-feedback" id="quizFeedback" style="display:none;"></div>
+            <button class="next-button" id="nextButton" style="display:none;">Continuar</button>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div class="modal" id="gameOverModal">
+        <div class="modal-content game-over">
+            <h2 class="modal-title" id="gameOverTitle">Tiempo Agotado</h2>
+            <p class="game-over-message" id="gameOverMessage"></p>
+            <div class="final-score">Puntos: <span id="finalScore">0</span></div>
+            <button class="restart-button" onclick="location.reload()">Jugar de Nuevo</button>
+        </div>
+    </div>
+
+    <script>
+        // -------------------
+        // Estado del juego
+        // -------------------
+        let lives = 3;
+        let timeLeft = 240;
+        let score = 20;
+        let timerInterval;
+        let draggedElement = null;
+        let currentPhase = 1;
+        // ahora totalItems cuenta fase1(2) + fase2(4) + fase3(1) = 7
+        let totalItems = 7;
+        let placedCount = 0;
+        let hasUsedRecoveryQuestion = false;
+        let placedItems = {
+            cephalic: null,
+            feet: null,
+            campo1: null,
+            campo2: null,
+            campo3: null,
+            campo4: null,
+            overlay: null
+        };
+
+        // Preguntas del quiz (igual que antes)
+        const questions = [
+            { question: "¿Cuál es el objetivo principal de la colocación de campos quirúrgicos??", options: ["Facilitar la postura del paciente", "Delimitar un área estéril y prevenir la contaminación ", "Reducir el sangrado quirúrgico", "Mejorar la iluminación en el campo"], correct: 1 },
+            { question: "¿Cuál es el orden correcto de colocación de campos para una apendicectomía?", options: ["Fenestrado → laterales → cefálico → caudal", "Caudal → cefálico → laterales → fenestrado ", "Laterales → fenestrado → cefálico → caudal", "Caudal → cefálico → fenestrado → laterales"], correct: 1 },
+            { question: "¿Dónde se coloca el campo fenestrado en una apendicectomía?", options: ["Región epigástrica", "Fosa ilíaca derecha (FID)", "Hipocondrio izquierdo", "Región umbilical"], correct: 1 },
+            { question: "¿Cuál de los siguientes campos se coloca primero durante la técnica estéril?", options: ["Campo fenestrado", "Campo cefálico", "Campo caudal ", "Campos laterales"], correct: 2 },
+            { question: "Una vez contaminado un campo quirúrgico, ¿qué acción es correcta?", options: ["Doblarlo hacia adentro y seguir usando", "Cubrirlo con otro campo estéril", "Retirarlo y reemplazarlo completamente ", "Secarlo con una gasa estéril"], correct: 2 }
+        ];
+
+        // Elementos DOM principales
+        const timerDisplay = document.getElementById('timer');
+        const scoreDisplay = document.getElementById('score');
+        const livesContainer = document.getElementById('lives');
+        const quizModal = document.getElementById('quizModal');
+        const gameOverModal = document.getElementById('gameOverModal');
+        const successModal = document.getElementById('successModal');
+        const phaseIndicator = document.getElementById('phaseIndicator');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const progressPercent = document.getElementById('progressPercent');
+        const successTitle = document.getElementById('successTitle');
+        const successMessage = document.getElementById('successMessage');
+        const successButton = document.getElementById('successButton');
+
+        // Actualiza barra de progreso
+        function updateProgress(){
+            const percentage = Math.round((placedCount / totalItems) * 100);
+            progressBar.style.width = percentage + '%';
+            progressBar.textContent = percentage + '%';
+            progressText.textContent = `Campos colocados: ${placedCount}/${totalItems}`;
+            progressPercent.textContent = percentage + '%';
+            if(placedCount === totalItems) progressBar.classList.add('complete');
+        }
+
+        // Inicializar drag & drop (desktop + touch)
+        function initDragAndDrop(){
+            const drapes = document.querySelectorAll('.drape');
+            const dropZones = document.querySelectorAll('.drop-zone');
+
+            drapes.forEach(drape => {
+                drape.addEventListener('dragstart', (e) => {
+                    if(!drape.classList.contains('placed') && drape.style.display !== 'none'){
+                        draggedElement = e.target.dataset.drape;
+                    }
+                });
+
+                drape.addEventListener('touchstart', (e) => {
+                    if(!drape.classList.contains('placed') && drape.style.display !== 'none'){
+                        draggedElement = e.target.dataset.drape;
+                        e.target.style.opacity = '0.5';
+                    }
+                });
+
+                drape.addEventListener('touchend', (e) => {
+                    e.target.style.opacity = '1';
+                    const touch = e.changedTouches[0];
+                    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                    const zone = element?.closest('.drop-zone');
+                    if(zone && draggedElement && zone.style.display !== 'none'){
+                        const zoneId = zone.dataset.zone;
+                        checkPlacement(zoneId, draggedElement);
+                    }
+                    draggedElement = null;
+                });
+            });
+
+            dropZones.forEach(zone => {
+                zone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    if(zone.style.display !== 'none') zone.classList.add('drag-over');
+                });
+                zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+                zone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    zone.classList.remove('drag-over');
+                    if(draggedElement && zone.style.display !== 'none'){
+                        const zoneId = zone.dataset.zone;
+                        checkPlacement(zoneId, draggedElement);
+                        draggedElement = null;
+                    }
+                });
+                // touchmove prevent
+                zone.addEventListener('touchmove', (e)=> e.preventDefault());
+            });
+        }
+
+        // Timer
+        function startTimer(){
+            timerInterval = setInterval(()=>{
+                timeLeft--;
+                updateTimerDisplay();
+                if(timeLeft <= 0) endGame('time');
+            },1000);
+        }
+
+        function updateTimerDisplay(){
+            const minutes = Math.floor(timeLeft/60);
+            const seconds = timeLeft % 60;
+            timerDisplay.textContent = `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+            if(timeLeft <= 30) timerDisplay.style.color = '#ef4444';
+        }
+
+        function updateLives(){
+            const lifeElements = livesContainer.querySelectorAll('.life');
+            lifeElements.forEach((life, index) => {
+                if(index >= lives) life.classList.add('lost');
+                else life.classList.remove('lost');
+            });
+        }
+
+        function updateScore(points){
+            score += points;
+            if(score < 0) score = 0;
+            if(score > 20) score = 20;
+            scoreDisplay.textContent = score;
+        }
+
+        // Validación de colocación
+        function checkPlacement(zoneId, drapeId){
+            const isCorrect = zoneId === drapeId;
+            // Caso especial: no permitir overlay hasta completar fase2
+            if(drapeId === 'overlay' && currentPhase !== 3){
+                // penalizar intento prematuro
+                lives--;
+                updateScore(-2);
+                updateLives();
+                if(lives <= 0){
+                    if(!hasUsedRecoveryQuestion) showQuiz();
+                    else endGame('lives');
+                }
+                return;
+            }
+
+            if(isCorrect){
+                // Si la zona ya tiene drape, no permitir (o ignorar)
+                const zoneEl = document.getElementById(`zone-${zoneId}`);
+                if(zoneEl.classList.contains('has-drape')) return;
+
+                placeDrape(zoneId, drapeId);
+                placedCount++;
+                updateProgress();
+                checkPhaseComplete();
+            } else {
+                lives--;
+                updateScore(-2);
+                updateLives();
+                if(lives <= 0){
+                    if(!hasUsedRecoveryQuestion) showQuiz();
+                    else endGame('lives');
+                }
+            }
+        }
+
+        // Colocar drape visualmente
+        function placeDrape(zoneId, drapeId){
+            const originalDrape = document.getElementById(`drape-${drapeId}`);
+            originalDrape.classList.add('placed');
+            originalDrape.setAttribute('draggable','false');
+
+            const zone = document.getElementById(`zone-${zoneId}`);
+            const placeholder = zone.querySelector('.placeholder');
+            if(placeholder) placeholder.style.display = 'none';
+            zone.classList.add('has-drape');
+            zone.style.border = 'none';
+
+            // overlay (fase3) necesita máscara para hueco; tratamos distinto
+            if(drapeId === 'overlay'){
+                const placedOverlay = document.createElement('div');
+                placedOverlay.className = 'placed-drape placed-overlay drape-overlay';
+                placedOverlay.style.cssText = `
+                    position:absolute !important;
+                    top:0 !important; left:0 !important; width:100% !important; height:100% !important;
+                    pointer-events:none !important; display:block !important; overflow:hidden !important;
+                    background-size:cover !important; background-position:center !important;
+                    z-index:995 !important;
+                    border-radius:8px !important;
+                `;
+                // Imagen similar a sabanas2.jpg (ajusta ruta si tu imagen se llama distinto)
+                placedOverlay.style.backgroundImage = 'url("img/sabanas2.jpg")';
+
+                // Crear "hueco" usando mask (soportado en navegadores modernos)
+                // Ajusta los porcentajes si quieres hueco más grande/pequeño
+                const maskValue = 'radial-gradient(circle at center, transparent 0 28%, black 30% 100%)';
+                placedOverlay.style.webkitMaskImage = maskValue;
+                placedOverlay.style.maskImage = maskValue;
+                // fallback: si browser no soporta mask, se añade un anillo visual
+                placedOverlay.style.boxShadow = 'inset 0 0 0 9999px rgba(0,0,0,0.12)';
+
+                zone.appendChild(placedOverlay);
+                placedItems[zoneId] = drapeId;
+                return;
+            }
+
+            // Drape normal
+            const placedDrape = document.createElement('div');
+            placedDrape.className = `placed-drape drape-${drapeId}`;
+            placedDrape.style.cssText = `
+                position:absolute !important;
+                top:0 !important; left:0 !important; width:100% !important; height:100% !important;
+                pointer-events:none !important; z-index:999 !important; display:block !important;
+                background-size:cover !important; background-position:center !important;
+                border-radius:8px !important; overflow:hidden !important;
+            `;
+            if(drapeId.includes('campo')) placedDrape.style.backgroundImage = 'url("img/sabanas2.jpg")';
+            else placedDrape.style.backgroundImage = 'url("img/sabanas.jpg")';
+
+            zone.appendChild(placedDrape);
+            placedItems[zoneId] = drapeId;
+        }
+
+        // Comprobación de final de fase
+        function checkPhaseComplete(){
+            if(currentPhase === 1){
+                if(placedItems.cephalic && placedItems.feet){
+                    clearInterval(timerInterval);
+                    // mostrar modal para pasar a fase2
+                    successTitle.textContent = 'Fase 1 Completada';
+                    successMessage.textContent = 'Has colocado correctamente las sábanas principales. Ahora coloca los campos quirúrgicos.';
+                    successButton.textContent = 'Iniciar Fase 2';
+                    successButton.onclick = () => { startPhase2(); successModal.classList.remove('show'); };
+                    successModal.classList.add('show');
+                }
+            } else if(currentPhase === 2){
+                if(placedItems.campo1 && placedItems.campo2 && placedItems.campo3 && placedItems.campo4){
+                    clearInterval(timerInterval);
+                    // mostrar modal para pasar a fase3
+                    successTitle.textContent = 'Fase 2 Completada';
+                    successMessage.textContent = 'Has colocado los campos laterales. Ahora debes colocar el Campo de Hendidura';
+                    successButton.textContent = 'Iniciar Fase 3';
+                    successButton.onclick = () => { startPhase3(); successModal.classList.remove('show'); };
+                    successModal.classList.add('show');
+                }
+            } else if(currentPhase === 3){
+                if(placedItems.overlay){
+                    // jugador ganó
+                    setTimeout(()=> endGame('win'), 800);
+                }
+            }
+        }
+
+        // Iniciar fase 2 (como antes)
+        function startPhase2(){
+            currentPhase = 2;
+            successModal.classList.remove('show');
+            phaseIndicator.textContent = 'Fase 2: Campos Quirúrgicos';
+
+            // Ajustes visuales (la sábana cefálica se hace más larga)
+            const zoneCephalic = document.getElementById('zone-cephalic');
+            if(zoneCephalic) zoneCephalic.style.height = '18%';
+
+            // Mostrar drapes y zonas fase2
+            document.querySelectorAll('.phase2').forEach(d => d.style.display = 'block');
+            document.querySelectorAll('.phase2-zone').forEach(z => z.style.display = 'block');
+
+            // Reiniciar timer para fase2 (o continuar)
+            startTimer();
+        }
+
+        // Iniciar fase 3: mostrar drape overlay y zona central
+        function startPhase3(){
+            currentPhase = 3;
+            phaseIndicator.textContent = 'Fase 3: Campo de Hendidura';
+            // Mostrar drape overlay en la barra lateral
+            document.querySelectorAll('.phase3').forEach(d => d.style.display = 'block');
+            // Mostrar zona overlay central
+            document.querySelectorAll('.phase3-zone').forEach(z => z.style.display = 'block');
+
+            // Ajuste: permitir colocar overlay encima de todo
+            // start timer para fase3
+            timeLeft = Math.max(timeLeft, 60); // asegurar tiempo mínimo si quieres
+            startTimer();
+        }
+
+        // Mostrar quiz de recuperación
+        function showQuiz(){
+            clearInterval(timerInterval);
+            hasUsedRecoveryQuestion = true;
+            const randomQuestion = questions[Math.floor(Math.random() * questions.length)];
+            document.getElementById('questionText').textContent = randomQuestion.question;
+            const optionsContainer = document.getElementById('optionsContainer');
+            optionsContainer.innerHTML = '';
+            randomQuestion.options.forEach((option, idx) => {
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'option';
+                optionDiv.textContent = option;
+                optionDiv.onclick = () => checkAnswer(idx, randomQuestion.correct);
+                optionsContainer.appendChild(optionDiv);
+            });
+            document.getElementById('quizFeedback').style.display = 'none';
+            document.getElementById('nextButton').style.display = 'none';
+            quizModal.classList.add('show');
+        }
+
+        function checkAnswer(selected, correct){
+            const options = document.querySelectorAll('.option');
+            const feedback = document.getElementById('quizFeedback');
+            const nextButton = document.getElementById('nextButton');
+            options.forEach((option, index) => {
+                option.style.pointerEvents = 'none';
+                if(index === correct) option.classList.add('correct');
+                else if(index === selected) option.classList.add('incorrect');
+            });
+            if(selected === correct){
+                feedback.className = 'quiz-feedback correct';
+                feedback.textContent = '¡Correcto! Has recuperado una vida.';
+                feedback.style.display = 'block';
+                lives = Math.min(3, lives + 1);
+                updateLives();
+                updateScore(5); // bonificación
+            } else {
+                feedback.className = 'quiz-feedback incorrect';
+                feedback.textContent = 'Incorrecto. Fin del juego.';
+                feedback.style.display = 'block';
+            }
+            nextButton.style.display = 'block';
+            nextButton.onclick = () => {
+                if(selected === correct){
+                    quizModal.classList.remove('show');
+                    startTimer();
+                } else {
+                    endGame('quiz');
+                }
+            };
+        }
+
+        function endGame(reason){
+            clearInterval(timerInterval);
+            const gameOverTitle = document.getElementById('gameOverTitle');
+            const gameOverMessage = document.getElementById('gameOverMessage');
+            const finalScore = document.getElementById('finalScore');
+            finalScore.textContent = score;
+            if(reason === 'win'){
+                gameOverTitle.textContent = '¡Felicitaciones!';
+                gameOverMessage.textContent = 'Has completado todas las fases correctamente. ¡Excelente trabajo en el quirófano!';
+            } else if(reason === 'time'){
+                gameOverTitle.textContent = 'Tiempo Agotado';
+                gameOverMessage.textContent = 'Se acabó el tiempo. ¡Intenta de nuevo!';
+            } else if(reason === 'quiz'){
+                gameOverTitle.textContent = 'Juego Terminado';
+                gameOverMessage.textContent = 'No lograste responder la pregunta correctamente.';
+            } else if(reason === 'lives'){
+                gameOverTitle.textContent = 'Sin Vidas';
+                gameOverMessage.textContent = 'Ya utilizaste tu pregunta de recuperación. ¡Intenta de nuevo!';
+            }
+            quizModal.classList.remove('show');
+            gameOverModal.classList.add('show');
+        }
+
+        // START
+        initDragAndDrop();
+        startTimer();
+        updateProgress();
+
+        // Observador DOM: para que drapes y zonas añadidos/mostrados después sean interactivos,
+        // re-inicializamos eventos cada vez que mostramos nuevas drapes/zones.
+        // (fácil y suficiente para este juego)
+        const originalShowPhase2 = startPhase2;
+        startPhase2 = function(){
+            originalShowPhase2();
+            // re-iniciar listeners para nuevos drapes/zones visibles
+            initDragAndDrop();
+        };
+
+        const originalStartPhase3 = startPhase3;
+        startPhase3 = function(){
+            originalStartPhase3();
+            initDragAndDrop();
+        };
+
+        // Asegurar que la UI muestre progreso correcto desde el inicio
+        updateLives();
+    </script>
+</body>
+</html>
